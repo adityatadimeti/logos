@@ -1,2 +1,3 @@
 [console_scripts]
 logos-brain = brain_server:main
+logos-observe = observability_server:main

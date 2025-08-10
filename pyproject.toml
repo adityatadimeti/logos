@@ -54,6 +54,21 @@ Issues = "https://github.com/adityatadimeti/logos/issues"
 
 [project.scripts]
 logos-brain = "brain_server:main"
+logos-observe = "observability_server:main"
+
+[tool.setuptools]
+py-modules = [
+  "base_agent",
+  "brain_server",
+  "database_agent",
+  "frontend_app",
+  "llm_utils",
+  "observability",
+  "observability_server",
+  "viz_agent",
+  "web_agent",
+  "logos",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -69,12 +84,18 @@ include = '\\.pyi?$'
 extend-exclude = '''
 /(
   # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
+  \\.
+  eggs
+  | \\.
+  git
+  | \\.
+  hg
+  | \\.
+  mypy_cache
+  | \\.
+  tox
+  | \\.
+  venv
   | build
   | dist
 )/

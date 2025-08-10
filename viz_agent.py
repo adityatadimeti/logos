@@ -5,6 +5,22 @@ import io
 import os
 from typing import Any, Dict, List, Optional
 
+from dotenv import load_dotenv  # type: ignore
+
+load_dotenv()
+
+try:
+    from observability import trace, traceback  # type: ignore
+except Exception:
+    def trace(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+    def traceback(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+
 
 def _require_dependency(import_name: str, pip_name: Optional[str] = None) -> None:
     try:
@@ -28,6 +44,7 @@ def _lazy_imports() -> None:
         pass
 
 
+@traceback(name="viz._to_png_base64", category="viz")
 def _to_png_base64(fig) -> str:
     import matplotlib.pyplot as plt  # type: ignore
 
@@ -38,6 +55,7 @@ def _to_png_base64(fig) -> str:
     return base64.b64encode(buf.read()).decode("ascii")
 
 
+@trace(name="viz._choose_chart_spec", category="llm")
 def _choose_chart_spec(user_question: str, rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Use the LLM to pick a minimal chart spec from the question and sample rows.
 
@@ -89,6 +107,7 @@ def _choose_chart_spec(user_question: str, rows: List[Dict[str, Any]]) -> Dict[s
         return fallback
 
 
+@traceback(name="viz._aggregate", category="viz")
 def _aggregate(rows: List[Dict[str, Any]], x: str, y: Optional[str], agg: str) -> Dict[str, List[Any]]:
     from collections import defaultdict
 
@@ -137,6 +156,7 @@ def _aggregate(rows: List[Dict[str, Any]], x: str, y: Optional[str], agg: str) -
     return {"x": xs, "y": ys}
 
 
+@traceback(name="viz._render_chart_png", category="viz")
 def _render_chart_png(spec: Dict[str, Any], series: Dict[str, List[Any]]) -> str:
     _lazy_imports()
     import matplotlib.pyplot as plt  # type: ignore
@@ -163,6 +183,7 @@ def _render_chart_png(spec: Dict[str, Any], series: Dict[str, List[Any]]) -> str
     return _to_png_base64(fig)
 
 
+@trace(name="agent.execute_viz_agent", category="agent")
 def execute_viz_agent(user_question: str, table: Optional[str] = None, limit: int = 500) -> Dict[str, Any]:
     """Fetch rows, decide a minimal chart spec, render a PNG, and return base64.
 

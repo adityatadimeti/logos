@@ -63,6 +63,7 @@ class QuerySpec:
     limit: Optional[int] = None
 
 
+@traceback(name="db._get_supabase_client", category="io")
 def _get_supabase_client():
     """Create and return a Supabase client using env vars.
 
@@ -80,6 +81,7 @@ def _get_supabase_client():
     return create_client(url, key)
 
 
+@traceback(name="db._execute_supabase_query", category="io")
 def _execute_supabase_query(spec: QuerySpec) -> Dict[str, Any]:
     client = _get_supabase_client()
     query = client.table(spec.table)
@@ -111,6 +113,7 @@ def _execute_supabase_query(spec: QuerySpec) -> Dict[str, Any]:
     return {"data": data, "count": count}
 
 
+@traceback(name="db.execute_query", category="db")
 def execute_query(query: Dict[str, Any] | QuerySpec) -> Dict[str, Any]:
     """Execute a Supabase query.
 
@@ -145,6 +148,7 @@ DB_FILTER_SYSTEM = (
 )
 
 
+@trace(name="agent.llm_filter_rows", category="llm")
 def llm_filter_rows(user_question: str, rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Use an LLM to select a subset of rows matching the user's question.
 
@@ -174,6 +178,20 @@ def llm_filter_rows(user_question: str, rows: List[Dict[str, Any]]) -> Dict[str,
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
+try:
+    from observability import trace, traceback  # type: ignore
+except Exception:
+    def trace(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+    def traceback(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+
+
+@trace(name="agent.execute_db_agent", category="agent")
 def execute_db_agent(user_question: str, table: Optional[str] = None, limit: int = 500) -> Dict[str, Any]:
     """Fetch a broad set of rows from Supabase, then use the LLM to filter them.
 

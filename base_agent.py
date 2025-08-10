@@ -38,6 +38,17 @@ ORCH_SYSTEM = (
 )
 
 
+# Optional observability
+try:
+    from observability import trace  # type: ignore
+except Exception:
+    def trace(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+
+
+@trace(name="node.plan", category="node")
 def _node_orchestrator_plan(state: AgentState) -> AgentState:
     user_q = str(state.get("user_input", ""))
     action: Optional[str] = None
@@ -69,6 +80,7 @@ def _node_orchestrator_plan(state: AgentState) -> AgentState:
 
 # -------- DB Agent (fetch + LLM filter) ---------
 
+@trace(name="node.db_agent", category="node")
 def _node_db_agent(state: AgentState) -> AgentState:
     try:
         from database_agent import execute_db_agent
@@ -84,6 +96,7 @@ def _node_db_agent(state: AgentState) -> AgentState:
 
 # -------- Viz Agent ---------
 
+@trace(name="node.viz_agent", category="node")
 def _node_viz_agent(state: AgentState) -> AgentState:
     try:
         from viz_agent import execute_viz_agent
@@ -99,6 +112,7 @@ def _node_viz_agent(state: AgentState) -> AgentState:
 
 # -------- Web Agent (Tavily) ---------
 
+@trace(name="node.web_agent", category="node")
 def _node_web_agent(state: AgentState) -> AgentState:
     try:
         from web_agent import execute_web_agent
@@ -114,6 +128,7 @@ def _node_web_agent(state: AgentState) -> AgentState:
 
 # -------- Respond ---------
 
+@trace(name="node.respond", category="node")
 def _node_orchestrator_respond(state: AgentState) -> AgentState:
     if "error" in state:
         return {"result": {"error": state["error"]}}
@@ -163,6 +178,7 @@ def build_app():
     return graph.compile()
 
 
+@trace(name="orchestrator.run", category="orchestrator")
 def run_orchestrator(user_input: Any) -> Dict[str, Any]:
     """Run the orchestrator flow with provided user_input (NL)."""
     from typing import cast

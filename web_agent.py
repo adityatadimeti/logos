@@ -23,6 +23,7 @@ def _lazy_imports() -> None:
     _require_dependency("tavily", "tavily-python")
 
 
+@traceback(name="web._summarize_with_llm", category="llm")
 def _summarize_with_llm(question: str, snippets: List[str]) -> str:
     try:
         from llm_utils import call_anthropic
@@ -40,6 +41,20 @@ def _summarize_with_llm(question: str, snippets: List[str]) -> str:
         return ""
 
 
+try:
+    from observability import trace, traceback  # type: ignore
+except Exception:
+    def trace(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+    def traceback(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+
+
+@trace(name="agent.execute_web_agent", category="agent")
 def execute_web_agent(user_question: str, max_results: int = 5) -> Dict[str, Any]:
     """Run a Tavily web search and return a summarized answer with sources.
 
