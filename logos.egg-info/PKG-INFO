@@ -12,18 +12,16 @@ Classifier: Development Status :: 3 - Alpha
 Classifier: Intended Audience :: Developers
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Programming Language :: Python :: 3
-Classifier: Programming Language :: Python :: 3.8
 Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
-Requires-Python: >=3.8
+Requires-Python: >=3.9
 Description-Content-Type: text/markdown
 Requires-Dist: flask>=2.0.0
 Requires-Dist: requests>=2.25.0
-Requires-Dist: langgraph>=0.2.0
-Requires-Dist: supabase>=2.0.0
-Requires-Dist: anthropic>=0.31.0
+Requires-Dist: supabase>=0.0.1
+Requires-Dist: langgraph>=0.6.4
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"
 Requires-Dist: pytest-cov>=4.0.0; extra == "dev"

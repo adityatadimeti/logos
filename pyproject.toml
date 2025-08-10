@@ -1,3 +1,6 @@
+
+
+
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
@@ -7,10 +10,10 @@ name = "logos"
 version = "0.1.0"
 description = "Logos is a framework for building agentic systems that can orchestrate."
 readme = "README.md"
-requires-python = ">=3.8"
-license = { text = "MIT" }
+requires-python = ">=3.9"
+license = {text = "MIT"}
 authors = [
-    { name = "Aditya Tadimeti", email = "adityatadimeti@gmail.com" }
+    {name = "Aditya Tadimeti", email = "adityatadimeti@gmail.com"}
 ]
 keywords = ["orchestration", "brain-server", "flask", "python"]
 classifiers = [
@@ -18,7 +21,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -27,14 +29,14 @@ classifiers = [
 dependencies = [
     "flask>=2.0.0",
     "requests>=2.25.0",
-    "langgraph>=0.2.0",
-    "supabase>=2.0.0",
-    "anthropic>=0.31.0",
+    "supabase>=0.0.1",
+    # Using a compatible version of langgraph that works with Python 3.8
+    "langgraph>=0.6.4",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
+    "pytest>=7.0.0",    
     "pytest-cov>=4.0.0",
     "black>=22.0.0",
     "flake8>=5.0.0",
@@ -48,7 +50,6 @@ Issues = "https://github.com/adityatadimeti/logos/issues"
 
 [project.scripts]
 logos-brain = "brain_server:main"
-logos-frontend = "frontend_app:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -117,4 +118,5 @@ addopts = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
-]
+] 
+
