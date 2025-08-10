@@ -1,25 +1,28 @@
 """
 Database access helper for Supabase.
 
-Exposes a minimal function to execute read-only queries against Supabase.
+Exposes functions to execute read-only queries against Supabase, and an
+LLM-powered DB agent that filters rows based on a natural-language question.
 
 Env vars required:
   - SUPABASE_URL
   - SUPABASE_ANON_KEY
 
-Example:
-    from database_agent import execute_query
+Optional env:
+  - DB_DEFAULT_TABLE (used by higher-level orchestrator)
 
-    rows = execute_query({
-        "table": "your_table",
-        "select": ["id", "name"],
-        "filters": {"status": "active"},
-        "limit": 5,
-    })
+Example:
+    from database_agent import execute_db_agent
+
+    result = execute_db_agent(
+        user_question="What did my shopping transactions look like this week?",
+        table="wellsdummydata",
+        limit=500,
+    )
+    # => {"rows": [...], "count": N}
 
 Notes:
-  - Filters are applied as equality (eq) predicates.
-  - Returns a dict with keys: {"data": [...], "count": int}.
+  - Filters are applied by the LLM; we first fetch a broad slice of rows.
 """
 
 from __future__ import annotations
@@ -130,6 +133,63 @@ def execute_query(query: Dict[str, Any] | QuerySpec) -> Dict[str, Any]:
         spec = query
 
     return _execute_supabase_query(spec)
+
+
+# ---------- LLM-based row filtering ----------
+
+DB_FILTER_SYSTEM = (
+    "You are a data filtering assistant for banking data.\n"
+    "You will be provided with a JSON array of rows and a natural-language question.\n"
+    "Return ONLY a JSON object with the following shape: {\"rows\": [...]} where rows is the subset\n"
+    "of the provided rows that best matches the user's request. Do not invent rows.\n"
+)
+
+
+def llm_filter_rows(user_question: str, rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Use an LLM to select a subset of rows matching the user's question.
+
+    Returns a dict: {"rows": [...]}.
+    """
+    # Avoid huge payloads: cap rows count
+    MAX_ROWS = 800
+    sample = rows[:MAX_ROWS] if rows else []
+    try:
+        from llm_utils import call_anthropic_json
+
+        user_msg = (
+            "User question:\n" + user_question + "\n\n"
+            "Rows (JSON array):\n" + __import__("json").dumps(sample)
+        )
+        out = call_anthropic_json(
+            system_prompt=DB_FILTER_SYSTEM,
+            user_message=user_msg,
+            max_tokens=2000,
+        )
+        # Expect out to contain {"rows": [...]}.
+        rows_out = out.get("rows") if isinstance(out, dict) else None
+        if not isinstance(rows_out, list):
+            raise ValueError("Model did not return a 'rows' array")
+        return {"rows": rows_out}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def execute_db_agent(user_question: str, table: Optional[str] = None, limit: int = 500) -> Dict[str, Any]:
+    """Fetch a broad set of rows from Supabase, then use the LLM to filter them.
+
+    Returns {"rows": [...], "count": int} or {"error": str}.
+    """
+    target_table = table or os.environ.get("DB_DEFAULT_TABLE") or "wellsdummydata"
+    try:
+        fetched = _execute_supabase_query(QuerySpec(table=target_table, limit=limit))
+        data = fetched.get("data") or []
+        filtered = llm_filter_rows(user_question, data)
+        if "error" in filtered:
+            return filtered
+        rows_out = filtered.get("rows") or []
+        return {"rows": rows_out, "count": len(rows_out)}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
 
 
 
