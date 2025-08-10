@@ -23,6 +23,7 @@ class AgentState(TypedDict, total=False):
     user_input: Any
     db_result: Dict[str, Any]
     viz_result: Dict[str, Any]
+    web_result: Dict[str, Any]
     route: str
     result: Any
     error: str
@@ -32,8 +33,8 @@ class AgentState(TypedDict, total=False):
 ORCH_SYSTEM = (
     "You are the Orchestrator for a banking assistant. "
     "Decide which specialized agent to call based on the user's question.\n"
-    "Available agents: 'db_agent' (fetch and filter rows) and 'viz_agent' (simple chart).\n\n"
-    "Respond with JSON only: {action: 'db_agent'|'viz_agent'}"
+    "Available agents: 'db_agent' (fetch and filter rows), 'viz_agent' (simple chart), and 'web_agent' (web search).\n\n"
+    "Respond with JSON only: {action: 'db_agent'|'viz_agent'|'web_agent'}"
 )
 
 
@@ -53,10 +54,12 @@ def _node_orchestrator_plan(state: AgentState) -> AgentState:
         # Swallow LLM errors and fall back to a simple keyword heuristic
         action = None
 
-    if action not in {"db_agent", "viz_agent"}:
+    if action not in {"db_agent", "viz_agent", "web_agent"}:
         lower_q = user_q.lower()
         if any(k in lower_q for k in ["visual", "chart", "plot", "graph", "bar chart", "line chart", "visualize", "visualise"]):
             action = "viz_agent"
+        elif any(k in lower_q for k in ["search", "google", "web", "news", "latest", "look up", "find online"]):
+            action = "web_agent"
         else:
             action = "db_agent"
     if os.environ.get("LOG_LLM", "").lower() in {"1", "true", "yes", "on"}:
@@ -94,6 +97,21 @@ def _node_viz_agent(state: AgentState) -> AgentState:
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
+# -------- Web Agent (Tavily) ---------
+
+def _node_web_agent(state: AgentState) -> AgentState:
+    try:
+        from web_agent import execute_web_agent
+
+        user_q = str(state.get("user_input", ""))
+        out = execute_web_agent(user_q)
+        if "error" in out:
+            return {"error": out["error"]}
+        return {"web_result": out}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
 # -------- Respond ---------
 
 def _node_orchestrator_respond(state: AgentState) -> AgentState:
@@ -101,6 +119,8 @@ def _node_orchestrator_respond(state: AgentState) -> AgentState:
         return {"result": {"error": state["error"]}}
     if "viz_result" in state:
         return {"result": state.get("viz_result")}
+    if "web_result" in state:
+        return {"result": state.get("web_result")}
     return {"result": state.get("db_result")}
 
 
@@ -116,6 +136,7 @@ def build_app():
     graph.add_node("plan", _node_orchestrator_plan)
     graph.add_node("db_agent", _node_db_agent)
     graph.add_node("viz_agent", _node_viz_agent)
+    graph.add_node("web_agent", _node_web_agent)
     graph.add_node("respond", _node_orchestrator_respond)
 
     graph.set_entry_point("plan")
@@ -129,9 +150,14 @@ def build_app():
     def _route_on_error(state: AgentState) -> str:
         return "error" if "error" in state else "ok"
 
-    graph.add_conditional_edges("plan", _route_from_plan, {"db_agent": "db_agent", "viz_agent": "viz_agent", "error": "respond"})
+    graph.add_conditional_edges(
+        "plan",
+        _route_from_plan,
+        {"db_agent": "db_agent", "viz_agent": "viz_agent", "web_agent": "web_agent", "error": "respond"},
+    )
     graph.add_conditional_edges("db_agent", _route_on_error, {"ok": "respond", "error": "respond"})
     graph.add_conditional_edges("viz_agent", _route_on_error, {"ok": "respond", "error": "respond"})
+    graph.add_conditional_edges("web_agent", _route_on_error, {"ok": "respond", "error": "respond"})
 
     graph.add_edge("respond", END)
     return graph.compile()
