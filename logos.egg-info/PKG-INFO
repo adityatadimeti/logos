@@ -21,6 +21,9 @@ Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 Requires-Dist: flask>=2.0.0
 Requires-Dist: requests>=2.25.0
+Requires-Dist: langgraph>=0.2.0
+Requires-Dist: supabase>=2.0.0
+Requires-Dist: anthropic>=0.31.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"
 Requires-Dist: pytest-cov>=4.0.0; extra == "dev"
