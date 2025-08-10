@@ -73,9 +73,22 @@ def call_anthropic_json(
         temperature=temperature,
         max_tokens=max_tokens,
     )
+    # Optional debug logging of raw LLM output
+    try:
+        if os.environ.get("LOG_LLM", "").lower() in {"1", "true", "yes", "on"}:
+            preview = text if len(text) <= 2000 else (text[:2000] + "... [truncated]")
+            print("[LLM JSON] Raw response preview:\n" + preview)
+    except Exception:
+        pass
     # Fast path: direct JSON
     try:
-        return json.loads(text)
+        parsed = json.loads(text)
+        try:
+            if os.environ.get("LOG_LLM", "").lower() in {"1", "true", "yes", "on"}:
+                print("[LLM JSON] Parsed object:", parsed)
+        except Exception:
+            pass
+        return parsed
     except Exception:
         pass
 
@@ -85,7 +98,13 @@ def call_anthropic_json(
     if start != -1 and end != -1 and end > start:
         candidate = text[start : end + 1]
         try:
-            return json.loads(candidate)
+            parsed = json.loads(candidate)
+            try:
+                if os.environ.get("LOG_LLM", "").lower() in {"1", "true", "yes", "on"}:
+                    print("[LLM JSON] Parsed object (extracted):", parsed)
+            except Exception:
+                pass
+            return parsed
         except Exception:
             pass
     raise ValueError("Model did not return valid JSON") 

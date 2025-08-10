@@ -4,6 +4,7 @@ supabase>=0.0.1
 langgraph>=0.6.4
 anthropic>=0.62.0
 python-dotenv>=1.0.0
+matplotlib>=3.7.0
 
 [dev]
 pytest>=7.0.0

@@ -24,6 +24,7 @@ Requires-Dist: supabase>=0.0.1
 Requires-Dist: langgraph>=0.6.4
 Requires-Dist: anthropic>=0.62.0
 Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: matplotlib>=3.7.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"
 Requires-Dist: pytest-cov>=4.0.0; extra == "dev"

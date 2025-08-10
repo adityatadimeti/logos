@@ -22,6 +22,8 @@ def _lazy_imports() -> None:
 class AgentState(TypedDict, total=False):
     user_input: Any
     db_result: Dict[str, Any]
+    viz_result: Dict[str, Any]
+    route: str
     result: Any
     error: str
 
@@ -29,20 +31,37 @@ class AgentState(TypedDict, total=False):
 # -------- Orchestrator (LLM decides which agent) ---------
 ORCH_SYSTEM = (
     "You are the Orchestrator for a banking assistant. "
-    "For now, always select the 'db_agent' to answer questions using the database.\n\n"
-    "Return JSON: {action: 'db_agent'}"
+    "Decide which specialized agent to call based on the user's question.\n"
+    "Available agents: 'db_agent' (fetch and filter rows) and 'viz_agent' (simple chart).\n\n"
+    "Respond with JSON only: {action: 'db_agent'|'viz_agent'}"
 )
 
 
 def _node_orchestrator_plan(state: AgentState) -> AgentState:
+    user_q = str(state.get("user_input", ""))
+    action: Optional[str] = None
     try:
-        # In this phase, we always choose db_agent. LLM call kept for extensibility.
         from llm_utils import call_anthropic_json
 
-        _ = call_anthropic_json(system_prompt=ORCH_SYSTEM, user_message=str(state.get("user_input", "")))
-        return {}
-    except Exception as exc:  # noqa: BLE001
-        return {"error": f"{type(exc).__name__}: {exc}"}
+        out = call_anthropic_json(system_prompt=ORCH_SYSTEM, user_message=user_q)
+        if isinstance(out, dict):
+            action = out.get("action")
+            # Optional debug logging
+            if os.environ.get("LOG_LLM", "").lower() in {"1", "true", "yes", "on"}:
+                print("[ORCH] LLM route decision:", out)
+    except Exception:
+        # Swallow LLM errors and fall back to a simple keyword heuristic
+        action = None
+
+    if action not in {"db_agent", "viz_agent"}:
+        lower_q = user_q.lower()
+        if any(k in lower_q for k in ["visual", "chart", "plot", "graph", "bar chart", "line chart", "visualize", "visualise"]):
+            action = "viz_agent"
+        else:
+            action = "db_agent"
+    if os.environ.get("LOG_LLM", "").lower() in {"1", "true", "yes", "on"}:
+        print("[ORCH] Final route:", action)
+    return {"route": action}
 
 
 # -------- DB Agent (fetch + LLM filter) ---------
@@ -60,11 +79,28 @@ def _node_db_agent(state: AgentState) -> AgentState:
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
+# -------- Viz Agent ---------
+
+def _node_viz_agent(state: AgentState) -> AgentState:
+    try:
+        from viz_agent import execute_viz_agent
+
+        user_q = str(state.get("user_input", ""))
+        out = execute_viz_agent(user_q)
+        if "error" in out:
+            return {"error": out["error"]}
+        return {"viz_result": out}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
 # -------- Respond ---------
 
 def _node_orchestrator_respond(state: AgentState) -> AgentState:
     if "error" in state:
         return {"result": {"error": state["error"]}}
+    if "viz_result" in state:
+        return {"result": state.get("viz_result")}
     return {"result": state.get("db_result")}
 
 
@@ -79,15 +115,23 @@ def build_app():
 
     graph.add_node("plan", _node_orchestrator_plan)
     graph.add_node("db_agent", _node_db_agent)
+    graph.add_node("viz_agent", _node_viz_agent)
     graph.add_node("respond", _node_orchestrator_respond)
 
     graph.set_entry_point("plan")
 
+    def _route_from_plan(state: AgentState) -> str:
+        if "error" in state:
+            return "error"
+        action = state.get("route")
+        return action or "db_agent"
+
     def _route_on_error(state: AgentState) -> str:
         return "error" if "error" in state else "ok"
 
-    graph.add_conditional_edges("plan", _route_on_error, {"ok": "db_agent", "error": "respond"})
+    graph.add_conditional_edges("plan", _route_from_plan, {"db_agent": "db_agent", "viz_agent": "viz_agent", "error": "respond"})
     graph.add_conditional_edges("db_agent", _route_on_error, {"ok": "respond", "error": "respond"})
+    graph.add_conditional_edges("viz_agent", _route_on_error, {"ok": "respond", "error": "respond"})
 
     graph.add_edge("respond", END)
     return graph.compile()

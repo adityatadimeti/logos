@@ -13,14 +13,16 @@ INDEX_HTML = """
 <head>
   <meta charset="utf-8" />
   <title>Banking Assistant</title>
-  <style>
+    <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding: 2rem; }
     .container { max-width: 800px; margin: auto; }
     textarea { width: 100%; height: 120px; font-size: 16px; padding: 10px; }
     button { padding: 10px 16px; font-size: 16px; }
     pre { background: #f5f5f5; padding: 12px; overflow: auto; }
     .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-top: 16px; }
-  </style>
+    .img-wrap { margin-top: 12px; }
+    .img-wrap img { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 6px; }
+    </style>
 </head>
 <body>
   <div class="container">
@@ -33,10 +35,20 @@ INDEX_HTML = """
       </div>
     </form>
 
-    {% if result %}
+    {% if payload %}
     <div class="card">
       <h3>Result</h3>
-      <pre>{{ result | tojson(indent=2) }}</pre>
+      {% if payload.image_base64 %}
+        <div class="img-wrap">
+          <img src="data:image/png;base64,{{ payload.image_base64 }}" alt="{{ payload.alt or 'Visualization' }}" />
+        </div>
+        <details style="margin-top: 12px;">
+          <summary>Raw result JSON</summary>
+          <pre>{{ result | tojson(indent=2) }}</pre>
+        </details>
+      {% else %}
+        <pre>{{ payload | tojson(indent=2) }}</pre>
+      {% endif %}
     </div>
     {% endif %}
   </div>
@@ -49,11 +61,17 @@ INDEX_HTML = """
 def index():
     question = None
     result = None
+    payload = None
     if request.method == "POST":
         question = request.form.get("question", "").strip()
         if question:
             result = run_orchestrator(question)
-    return render_template_string(INDEX_HTML, question=question, result=result)
+            # Normalize for UI: backend returns {result: {...}} on success
+            if isinstance(result, dict) and "result" in result:
+                payload = result.get("result")
+            else:
+                payload = result
+    return render_template_string(INDEX_HTML, question=question, result=result, payload=payload)
 
 
 def main():
