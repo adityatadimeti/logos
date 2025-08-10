@@ -1,8 +1,12 @@
 import functools
 import requests
 import json
+import os
 
-BRAIN_URL = "http://127.0.0.1:5000/intervene"
+# The brain server URL is now configurable via environment variables
+HOST = os.environ.get('HOST', '127.0.0.1')
+PORT = os.environ.get('PORT', 5000)
+BRAIN_URL = f"http://{HOST}:{PORT}/intervene"
 
 def orchestrate(func):
     """

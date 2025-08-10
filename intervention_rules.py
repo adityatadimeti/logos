@@ -7,7 +7,7 @@ def get_intervention_rules():
     rule1 = Rule(
         conditions=[
             Condition('function_name', '==', 'fetch_web_content'),
-            Condition('content_length', '>', 50000000000)
+            Condition('content_length', '>', 5217920)
         ],
         action=lambda data: {
             "action": "return_value",
