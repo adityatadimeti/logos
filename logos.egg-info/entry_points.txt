@@ -1,0 +1,2 @@
+[console_scripts]
+logos-brain = brain_server:main
