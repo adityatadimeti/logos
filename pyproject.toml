@@ -32,6 +32,8 @@ dependencies = [
     "supabase>=0.0.1",
     # Using a compatible version of langgraph that works with Python 3.8
     "langgraph>=0.6.4",
+    "anthropic>=0.62.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]

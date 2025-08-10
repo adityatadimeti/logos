@@ -4,6 +4,14 @@ import json
 import os
 from typing import Any, Dict, Optional
 
+# Load .env variables if present
+try:
+    from dotenv import load_dotenv  # type: ignore
+
+    load_dotenv()
+except Exception:
+    pass
+
 
 def _get_anthropic_client():
     try:

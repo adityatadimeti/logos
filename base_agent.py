@@ -33,7 +33,7 @@ ORCH_SYSTEM = (
     "Decide which specialized agent to call based on the user's question. "
     "Right now, the only available agent is 'db_agent' for fetching rows from a Supabase database.\n\n"
     "Output strict JSON with keys: action (one of: db_agent, unknown), and if action is db_agent, "
-    "include db_query with: {table: string, select: array|null, filters: object|null, limit: int|null}.\n"
+    "include db_query with: {table: 'wellsdummydata', select: array|null, filters: object|null, limit: int|null}.\n"
     "- select should be an array of column names or null for all columns.\n"
     "- filters is a JSON object of equality predicates (e.g., {\"status\": \"active\"}).\n"
     "- limit is an integer or null.\n"
@@ -58,6 +58,7 @@ def _node_orchestrator_plan(state: AgentState) -> AgentState:
             user_message=str(user_q),
         )
         action = resp.get("action")
+        print("anthropic response: ", resp)
         if action != "db_agent":
             return {"error": "Orchestrator could not route this question to a known agent"}
         db_query = resp.get("db_query") or {}
@@ -135,12 +136,26 @@ def build_app():
 
     graph.set_entry_point("plan")
 
-    # plan -> db_plan -> db_execute -> respond -> END
-    graph.add_edge("plan", "db_plan")
-    graph.add_edge("db_plan", "db_execute")
+    def _route_on_error(state: AgentState) -> str:
+        return "error" if "error" in state else "ok"
+
+    # plan -> (error? respond : db_plan)
+    graph.add_conditional_edges(
+        "plan",
+        _route_on_error,
+        {"ok": "db_plan", "error": "respond"},
+    )
+
+    # db_plan -> (error? respond : db_execute)
+    graph.add_conditional_edges(
+        "db_plan",
+        _route_on_error,
+        {"ok": "db_execute", "error": "respond"},
+    )
+
+    # db_execute -> respond
     graph.add_edge("db_execute", "respond")
     graph.add_edge("respond", END)
-
     return graph.compile()
 
 
