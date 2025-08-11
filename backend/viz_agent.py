@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import base64
-import io
 import os
 from typing import Any, Dict, List, Optional
 
@@ -16,33 +14,11 @@ def _require_dependency(import_name: str, pip_name: Optional[str] = None) -> Non
         ) from exc
 
 
-def _lazy_imports() -> None:
-    # Force non-GUI backend for server environments (Flask background thread)
-    os.environ.setdefault("MPLBACKEND", "Agg")
-    _require_dependency("matplotlib")
-    try:  # ensure backend stickiness even if default is GUI
-        import matplotlib  # type: ignore
-        if getattr(matplotlib, "get_backend", None) and matplotlib.get_backend() != "Agg":
-            matplotlib.use("Agg")
-    except Exception:
-        pass
-
-
-def _to_png_base64(fig) -> str:
-    import matplotlib.pyplot as plt  # type: ignore
-
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight")
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode("ascii")
-
-
 def _choose_chart_spec(user_question: str, rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Use the LLM to pick a minimal chart spec from the question and sample rows.
 
     Returns a dict like:
-      {"chart": "bar"|"line", "x": "column", "y": "column"|null, "agg": "count"|"sum"|"avg"|"none"}
+      {"chart": "bar"|"line"|"pie", "x": "column", "y": "column"|null, "agg": "count"|"sum"|"avg"|"none"}
     """
     sample = rows[:200] if rows else []
     try:
@@ -51,8 +27,8 @@ def _choose_chart_spec(user_question: str, rows: List[Dict[str, Any]]) -> Dict[s
 
         system = (
             "You design a very simple chart from tabular rows. Respond with JSON only.\n"
-            "Return keys: {chart: 'bar'|'line', x: string, y: string|null, agg: 'count'|'sum'|'avg'|'none'}.\n"
-            "Pick columns that exist. Prefer bar with count by category; line for time series."
+            "Return keys: {chart: 'bar'|'line'|'pie', x: string, y: string|null, agg: 'count'|'sum'|'avg'|'none'}.\n"
+            "Guidance: Use 'bar' for category comparisons (counts/sums), 'line' for time series or sequences, 'pie' for share of whole across categories (counts or sums)."
         )
         msg = (
             "User question:\n"
@@ -66,24 +42,32 @@ def _choose_chart_spec(user_question: str, rows: List[Dict[str, Any]]) -> Dict[s
         # Minimal validation
         if not isinstance(spec, dict) or not spec.get("chart") or not spec.get("x"):
             raise ValueError("Model did not return a valid chart spec")
+        chart_val = (spec.get("chart") or "bar").lower()
+        if chart_val not in {"bar", "line", "pie"}:
+            chart_val = "bar"
         return {
-            "chart": spec.get("chart", "bar"),
+            "chart": chart_val,
             "x": spec.get("x"),
             "y": spec.get("y"),
             "agg": spec.get("agg", "count"),
         }
     except Exception:
-        # Heuristic fallback: bar count of first string-like column
+        # Heuristic fallback: pie or bar for categories, line if looks like time series
+        chart_val = "bar"
+        if rows:
+            # crude time-series detection: any key containing 'date' or 'time'
+            keys = list(rows[0].keys())
+            if any("date" in k.lower() or "time" in k.lower() for k in keys):
+                chart_val = "line"
         x_col = None
         if rows:
             for key in rows[0].keys():
-                # choose first non-numeric column as category
                 val = rows[0].get(key)
                 if not isinstance(val, (int, float)):
                     x_col = key
                     break
         x_col = x_col or (list(rows[0].keys())[0] if rows else "category")
-        fallback = {"chart": "bar", "x": x_col, "y": None, "agg": "count"}
+        fallback = {"chart": chart_val, "x": x_col, "y": None, "agg": "count"}
         if os.environ.get("LOG_LLM", "").lower() in {"1", "true", "yes", "on"}:
             print("[VIZ] Spec fallback:", fallback)
         return fallback
@@ -137,36 +121,75 @@ def _aggregate(rows: List[Dict[str, Any]], x: str, y: Optional[str], agg: str) -
     return {"x": xs, "y": ys}
 
 
-def _render_chart_png(spec: Dict[str, Any], series: Dict[str, List[Any]]) -> str:
-    _lazy_imports()
-    import matplotlib.pyplot as plt  # type: ignore
+def _build_chartjs_payload(spec: Dict[str, Any], series: Dict[str, List[Any]]) -> Dict[str, Any]:
+    labels = [str(x) for x in series.get("x", [])]
+    data = series.get("y", [])
+    dataset_label = f"{spec.get('agg','count')} of {spec.get('y') or spec.get('x')}"
+    chart_type = (spec.get("chart") or "bar").lower()
 
-    chart = (spec.get("chart") or "bar").lower()
-    fig, ax = plt.subplots(figsize=(6, 4))
-    x_vals = series.get("x", [])
-    y_vals = series.get("y", [])
+    # Provide a palette for pie slices
+    slice_colors = [
+        "#4f46e5", "#06b6d4", "#22c55e", "#f59e0b", "#ef4444",
+        "#8b5cf6", "#14b8a6", "#84cc16", "#eab308", "#f97316",
+    ]
 
-    if chart == "line":
-        ax.plot(x_vals, y_vals, marker="o")
-    else:
-        ax.bar(x_vals, y_vals)
+    if chart_type == "pie":
+        chartjs = {
+            "type": "pie",
+            "data": {
+                "labels": labels,
+                "datasets": [
+                    {
+                        "label": dataset_label,
+                        "data": data,
+                        "backgroundColor": slice_colors[: max(1, len(data))],
+                        "borderColor": "#111827",
+                    }
+                ],
+            },
+            "options": {
+                "responsive": True,
+                "plugins": {
+                    "legend": {"display": True},
+                    "title": {"display": True, "text": "Simple Visualization"},
+                },
+            },
+        }
+        return chartjs
 
-    ax.set_xlabel(str(spec.get("x") or "x"))
-    if spec.get("y"):
-        ax.set_ylabel(str(spec.get("y")))
-    else:
-        ax.set_ylabel(str(spec.get("agg") or "count"))
-    ax.set_title("Simple Visualization")
-    plt.xticks(rotation=45, ha="right")
-    plt.tight_layout()
-
-    return _to_png_base64(fig)
+    # Bar / Line
+    chartjs = {
+        "type": chart_type if chart_type in {"bar", "line"} else "bar",
+        "data": {
+            "labels": labels,
+            "datasets": [
+                {
+                    "label": dataset_label,
+                    "data": data,
+                    "backgroundColor": "rgba(79,70,229,0.5)",
+                    "borderColor": "rgba(79,70,229,1)",
+                }
+            ],
+        },
+        "options": {
+            "responsive": True,
+            "plugins": {
+                "legend": {"display": True},
+                "title": {"display": True, "text": "Simple Visualization"},
+            },
+            "scales": {
+                "x": {"ticks": {"autoSkip": True, "maxRotation": 45}},
+                "y": {"beginAtZero": True},
+            },
+        },
+    }
+    return chartjs
 
 
 def execute_viz_agent(user_question: str, table: Optional[str] = None, limit: int = 500) -> Dict[str, Any]:
-    """Fetch rows, decide a minimal chart spec, render a PNG, and return base64.
+    """Fetch rows, decide a minimal chart spec, and return Chart.js payload.
 
-    Returns {"image_base64": str, "alt": str} or {"error": str}.
+    Returns {"chartjs": {...}, "spec": {...}} or {"error": str}.
     """
     try:
         from database_agent import QuerySpec, _execute_supabase_query  # type: ignore
@@ -177,13 +200,8 @@ def execute_viz_agent(user_question: str, table: Optional[str] = None, limit: in
 
         spec = _choose_chart_spec(user_question, rows)
         series = _aggregate(rows, x=spec.get("x"), y=spec.get("y"), agg=spec.get("agg", "count"))
-        png_b64 = _render_chart_png(spec, series)
-        alt = (
-            f"{spec.get('chart','bar')} chart of {spec.get('agg','count')}"
-            f" by {spec.get('x')}"
-            + (f" vs {spec.get('y')}" if spec.get("y") else "")
-        )
-        return {"image_base64": png_b64, "alt": alt, "spec": spec}
+        chartjs = _build_chartjs_payload(spec, series)
+        return {"chartjs": chartjs, "spec": spec}
     except Exception as exc:  # noqa: BLE001
         return {"error": f"{type(exc).__name__}: {exc}"}
 

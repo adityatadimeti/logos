@@ -33,11 +33,12 @@ from typing import Any, Dict, List, Optional
 
 # Load .env variables if present
 try:
-    from dotenv import load_dotenv  # type: ignore
+    from dotenv import load_dotenv, find_dotenv  # type: ignore
 
-    load_dotenv()
+    load_dotenv(find_dotenv(), override=False)
 except Exception:
     pass
+
 
 
 def _require_dependency(import_name: str, pip_name: Optional[str] = None) -> None:
