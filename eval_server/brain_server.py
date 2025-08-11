@@ -1,3 +1,5 @@
+### DEPRECATED: DO NOT TOUCH
+
 from flask import Flask, request, jsonify, render_template_string
 import datetime
 from rules_engine import RuleEngine
@@ -133,6 +135,7 @@ HTML_TEMPLATE = """
                                     <strong>Brain Decision</strong>
                                     ${getDecisionBadge(entry.decision)}
                                 </div>
+
                             </div>
                             <div style="margin-top: 1.5rem;">
                                 <strong>Content Preview</strong>
@@ -151,6 +154,7 @@ HTML_TEMPLATE = """
                 const container = document.getElementById('history-container');
                 container.innerHTML = '<p style="text-align: center; color: red;">Could not load history.</p>';
             }
+
         }
         
         function escapeHtml(unsafe) {
@@ -179,5 +183,4 @@ def dashboard():
 if __name__ == '__main__':
     host = os.environ.get('HOST', '127.0.0.1')
     port = int(os.environ.get('PORT', 5000))
-    # Run on http://127.0.0.1:5000
     app.run(host=host, port=port, debug=True)
