@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import os
+import sys
 from flask import Flask, request, render_template_string, jsonify
 
-from base_agent import run_orchestrator
+# Ensure project root is importable so 'eval_server' can be imported by backend modules
+ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+from backend.base_agent import run_orchestrator
 
 app = Flask(__name__)
 

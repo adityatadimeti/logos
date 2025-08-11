@@ -12,6 +12,14 @@ try:
 except Exception:
     pass
 
+try:
+    from eval_server.observability import trace  # type: ignore
+except Exception:
+    def trace(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+
 
 def _get_anthropic_client():
     try:
@@ -27,6 +35,7 @@ def _get_anthropic_client():
     return anthropic.Anthropic(api_key=api_key)
 
 
+@trace(name="llm.call_anthropic", category="llm")
 def call_anthropic(
     system_prompt: str,
     user_message: str,
@@ -50,6 +59,7 @@ def call_anthropic(
     return "".join(parts).strip()
 
 
+@trace(name="llm.call_anthropic_json", category="llm")
 def call_anthropic_json(
     system_prompt: str,
     user_message: str,

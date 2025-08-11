@@ -35,6 +35,7 @@ dependencies = [
     "anthropic>=0.62.0",
     "python-dotenv>=1.0.0",
     "matplotlib>=3.7.0",
+    "tavily-python>=0.5.0",
 ]
 
 [project.optional-dependencies]
@@ -53,6 +54,21 @@ Issues = "https://github.com/adityatadimeti/logos/issues"
 
 [project.scripts]
 logos-brain = "brain_server:main"
+logos-observe = "observability_server:main"
+
+[tool.setuptools]
+py-modules = [
+  "base_agent",
+  "brain_server",
+  "database_agent",
+  "frontend_app",
+  "llm_utils",
+  "observability",
+  "observability_server",
+  "viz_agent",
+  "web_agent",
+  "logos",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -64,16 +80,22 @@ include = ["logos*"]
 [tool.black]
 line-length = 88
 target-version = ['py38']
-include = '\.pyi?$'
+include = '\\.pyi?$'
 extend-exclude = '''
 /(
   # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
+  \\.
+  eggs
+  | \\.
+  git
+  | \\.
+  hg
+  | \\.
+  mypy_cache
+  | \\.
+  tox
+  | \\.
+  venv
   | build
   | dist
 )/

@@ -3,6 +3,26 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional
 
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()
+except Exception:
+    pass
+
+# Observability must be imported before usage
+try:
+    from eval_server.observability import trace, traceback  # type: ignore
+except Exception:
+    def trace(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+
+    def traceback(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+
 
 def _require_dependency(import_name: str, pip_name: Optional[str] = None) -> None:
     try:
@@ -73,6 +93,7 @@ def _choose_chart_spec(user_question: str, rows: List[Dict[str, Any]]) -> Dict[s
         return fallback
 
 
+@traceback(name="viz._aggregate", category="viz")
 def _aggregate(rows: List[Dict[str, Any]], x: str, y: Optional[str], agg: str) -> Dict[str, List[Any]]:
     from collections import defaultdict
 
@@ -186,13 +207,14 @@ def _build_chartjs_payload(spec: Dict[str, Any], series: Dict[str, List[Any]]) -
     return chartjs
 
 
+@trace(name="agent.execute_viz_agent", category="agent")
 def execute_viz_agent(user_question: str, table: Optional[str] = None, limit: int = 500) -> Dict[str, Any]:
     """Fetch rows, decide a minimal chart spec, and return Chart.js payload.
 
     Returns {"chartjs": {...}, "spec": {...}} or {"error": str}.
     """
     try:
-        from database_agent import QuerySpec, _execute_supabase_query  # type: ignore
+        from backend.database_agent import QuerySpec, _execute_supabase_query  # type: ignore
 
         target_table = table or os.environ.get("DB_DEFAULT_TABLE") or "wellsdummydata"
         fetched = _execute_supabase_query(QuerySpec(table=target_table, limit=limit))
