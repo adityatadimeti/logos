@@ -4,6 +4,15 @@ from typing import Any, Dict, Optional, TypedDict
 
 import os
 
+# Optional observability import before usage
+try:
+    from observability import trace  # type: ignore
+except Exception:
+    def trace(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+
 
 def _require_dependency(import_name: str, pip_name: Optional[str] = None) -> None:
     try:
@@ -36,16 +45,6 @@ ORCH_SYSTEM = (
     "Available agents: 'db_agent' (fetch and filter rows), 'viz_agent' (simple chart), and 'web_agent' (web search).\n\n"
     "Respond with JSON only: {action: 'db_agent'|'viz_agent'|'web_agent'}"
 )
-
-
-# Optional observability
-try:
-    from observability import trace  # type: ignore
-except Exception:
-    def trace(*args, **kwargs):  # type: ignore
-        def _decorator(fn):
-            return fn
-        return _decorator
 
 
 @trace(name="node.plan", category="node")

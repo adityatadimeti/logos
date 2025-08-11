@@ -9,6 +9,7 @@ from dotenv import load_dotenv  # type: ignore
 
 load_dotenv()
 
+# Observability must be imported before usage
 try:
     from observability import trace, traceback  # type: ignore
 except Exception:
@@ -16,6 +17,7 @@ except Exception:
         def _decorator(fn):
             return fn
         return _decorator
+
     def traceback(*args, **kwargs):  # type: ignore
         def _decorator(fn):
             return fn

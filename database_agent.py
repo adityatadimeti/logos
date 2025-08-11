@@ -39,6 +39,20 @@ try:
 except Exception:
     pass
 
+# Observability decorators should be imported before any usage below
+try:
+    from observability import trace, traceback  # type: ignore
+except Exception:
+    def trace(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+
+    def traceback(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+
 
 def _require_dependency(import_name: str, pip_name: Optional[str] = None) -> None:
     try:
@@ -176,19 +190,6 @@ def llm_filter_rows(user_question: str, rows: List[Dict[str, Any]]) -> Dict[str,
         return {"rows": rows_out}
     except Exception as exc:  # noqa: BLE001
         return {"error": f"{type(exc).__name__}: {exc}"}
-
-
-try:
-    from observability import trace, traceback  # type: ignore
-except Exception:
-    def trace(*args, **kwargs):  # type: ignore
-        def _decorator(fn):
-            return fn
-        return _decorator
-    def traceback(*args, **kwargs):  # type: ignore
-        def _decorator(fn):
-            return fn
-        return _decorator
 
 
 @trace(name="agent.execute_db_agent", category="agent")

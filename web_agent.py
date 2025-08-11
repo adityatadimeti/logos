@@ -8,6 +8,20 @@ from dotenv import load_dotenv  # type: ignore
 
 load_dotenv()
 
+# Observability must be imported before decorator usage
+try:
+    from observability import trace, traceback  # type: ignore
+except Exception:
+    def trace(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+
+    def traceback(*args, **kwargs):  # type: ignore
+        def _decorator(fn):
+            return fn
+        return _decorator
+
 
 def _require_dependency(import_name: str, pip_name: Optional[str] = None) -> None:
     try:
@@ -39,19 +53,6 @@ def _summarize_with_llm(question: str, snippets: List[str]) -> str:
     except Exception:
         # If LLM fails for any reason, just return an empty answer and rely on sources.
         return ""
-
-
-try:
-    from observability import trace, traceback  # type: ignore
-except Exception:
-    def trace(*args, **kwargs):  # type: ignore
-        def _decorator(fn):
-            return fn
-        return _decorator
-    def traceback(*args, **kwargs):  # type: ignore
-        def _decorator(fn):
-            return fn
-        return _decorator
 
 
 @trace(name="agent.execute_web_agent", category="agent")
