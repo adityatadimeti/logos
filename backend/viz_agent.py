@@ -170,10 +170,10 @@ def _build_chartjs_payload(spec: Dict[str, Any], series: Dict[str, List[Any]]) -
             },
             "options": {
                 "responsive": True,
-                # "plugins": {
-                #     "legend": {"display": True},
-                #     # "title": {"display": True, "text": },
-                # },
+                "plugins": {
+                    "legend": {"display": True},
+                    "title": {"display": True, "text": "Simple Visualization"},
+                },
             },
         }
         return chartjs

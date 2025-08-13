@@ -161,7 +161,6 @@ DB_FILTER_SYSTEM = (
     "You will be provided with a JSON array of rows and a natural-language question.\n"
     "Return ONLY a JSON object with the following shape: {\"rows\": [...]} where rows is the subset\n"
     "of the provided rows that best matches the user's request. Do not invent rows.\n"
-    "If there are many matching rows, prioritize the most relevant ones and limit to 50 rows max.\n"
 )
 
 
@@ -184,34 +183,14 @@ def llm_filter_rows(user_question: str, rows: List[Dict[str, Any]]) -> Dict[str,
         out = call_anthropic_json(
             system_prompt=DB_FILTER_SYSTEM,
             user_message=user_msg,
-            max_tokens=8192,  # Increased for large JSON responses
+            max_tokens=2000,
         )
         # Expect out to contain {"rows": [...]}.
-        print("out", out)
         rows_out = out.get("rows") if isinstance(out, dict) else None
         if not isinstance(rows_out, list):
             raise ValueError("Model did not return a 'rows' array")
         return {"rows": rows_out}
     except Exception as exc:  # noqa: BLE001
-        # Fallback: if LLM filtering fails (e.g., response too large), return subset of original rows
-        import re
-        error_msg = str(exc)
-        if "JSON" in error_msg or "truncated" in error_msg.lower():
-            # Simple heuristic filtering as fallback
-            question_lower = user_question.lower()
-            filtered_rows = []
-            
-            # Look for expense-related keywords
-            expense_keywords = ["expense", "spending", "cost", "payment", "purchase", "fee", "charge"]
-            if any(keyword in question_lower for keyword in expense_keywords):
-                filtered_rows = [r for r in sample if float(r.get("Amount", 0)) < 0][:50]
-            
-            # If we found some rows, return them; otherwise return first 50
-            if filtered_rows:
-                return {"rows": filtered_rows}
-            else:
-                return {"rows": sample[:50]}
-        
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
